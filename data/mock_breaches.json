@@ -1,0 +1,5 @@
+{
+  "test@example.com": ["Adobe", "Dropbox", "LinkedIn"],
+  "safe@example.com": [],
+  "john@gmail.com": ["Twitter", "MyFitnessPal"]
+}
