@@ -1,34 +1,10 @@
 import pdfplumber
-from pdf2image import convert_from_bytes
-from PIL import Image, ImageFilter, ImageOps
-import pytesseract
-from io import BytesIO
 import re
 import PyPDF2
 import docx
-
-# === Configuration ===
-# Tesseract path (Windows)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-# Poppler path for PDF-to-image conversion (Windows)
-POPPLER_PATH = r"C:\poppler-25.07.0\Library\bin"
+from io import BytesIO
 
 # === Utility Functions ===
-
-def preprocess_image(img: Image.Image) -> Image.Image:
-    """Prepare image for OCR: grayscale, thresholding, noise reduction."""
-    img = img.convert('L')  # grayscale
-    img = ImageOps.invert(img)  # invert if background is dark
-    img = img.point(lambda x: 0 if x < 140 else 255)  # simple threshold
-    img = img.filter(ImageFilter.MedianFilter())  # reduce noise
-    return img
-
-def clean_ocr_text(text: str) -> str:
-    """Clean OCR output: remove unwanted symbols, normalize whitespace."""
-    text = re.sub(r'[^\w\s.,%-]', '', text)  # remove non-standard symbols
-    text = re.sub(r'\n\s*\n', '\n', text)    # remove multiple empty lines
-    text = re.sub(r'[ ]{2,}', ' ', text)     # normalize multiple spaces
-    return text.strip()
 
 def decrypt_pdf(file_bytes: bytes, pdf_password="") -> bytes:
     """Decrypt PDF if password protected. Returns bytes."""
@@ -51,39 +27,29 @@ def decrypt_pdf(file_bytes: bytes, pdf_password="") -> bytes:
 
 # === Main Extraction Functions ===
 
-def extract_text_from_pdf(file_bytes: bytes, pdf_password="") -> str:
-    """Extract text from PDF using pdfplumber first, fallback to OCR if needed."""
-    # Decrypt if needed
+def extract_text_from_pdf(file_bytes: bytes, pdf_password="") -> tuple[str, bool]:
+    """Extract text from standard (non-scanned) PDF using pdfplumber."""
     try:
         file_bytes = decrypt_pdf(file_bytes, pdf_password)
     except ValueError as e:
-        return f"[❌ {str(e)}]"
+        return f"[❌ {str(e)}]", True
 
-    # --- Try pdfplumber (text PDFs) ---
     try:
         with pdfplumber.open(BytesIO(file_bytes)) as pdf:
             text_pages = [page.extract_text() or "" for page in pdf.pages]
             text = "\n".join(text_pages).strip()
-        if text:
-            return f"[✅ Text PDF detected]\n{text}"
-    except:
-        text = ""
 
-    # --- OCR fallback (scanned PDFs) ---
-    try:
-        text = "[🧠 Using OCR to read scanned PDF...]\n"
-        images = convert_from_bytes(file_bytes, poppler_path=POPPLER_PATH)
-        for i, img in enumerate(images, 1):
-            processed_img = preprocess_image(img)
-            ocr_text = pytesseract.image_to_string(processed_img, lang='eng')
-            ocr_text = clean_ocr_text(ocr_text)
-            text += f"\n--- Page {i} ---\n{ocr_text}\n"
-        return text.strip()
+        # If no text found, likely scanned PDF
+        if not text:
+            return "[⚠️ This appears to be a scanned or image-based document. Scanned documents are not supported.]", True
+
+        return text, False
+
     except Exception as e:
-        return f"[❌ OCR failed: {str(e)}]"
+        return f"[❌ Error reading PDF: {str(e)}]", True
 
-def extract_text(file, pdf_password="") -> str:
-    """Extract text from PDF, DOCX, TXT, or image files."""
+def extract_text(file, pdf_password="") -> tuple[str, bool]:
+    """Extract text from PDF, DOCX, or TXT files."""
     filename = file.name.lower()
 
     # --- PDF ---
@@ -95,48 +61,48 @@ def extract_text(file, pdf_password="") -> str:
     elif filename.endswith(".docx"):
         try:
             doc = docx.Document(file)
-            text = "\n".join(p.text for p in doc.paragraphs)
-            return f"[✅ DOCX detected]\n{text}"
+            text = "\n".join(p.text for p in doc.paragraphs).strip()
+            if not text:
+                return "[⚠️ This DOCX file may contain only images or scanned content. Scanned documents are not supported.]", True
+            return text, False
         except Exception as e:
-            return f"[❌ Error reading DOCX: {str(e)}]"
+            return f"[❌ Error reading DOCX: {str(e)}]", True
 
     # --- TXT ---
     elif filename.endswith(".txt"):
         try:
-            text = file.read().decode("utf-8", errors="ignore")
-            return f"[✅ TXT detected]\n{text}"
+            text = file.read().decode("utf-8", errors="ignore").strip()
+            if not text:
+                return "[⚠️ Empty or unreadable text file.]", True
+            return text, False
         except Exception as e:
-            return f"[❌ Error reading TXT: {str(e)}]"
-
-    # --- Images ---
-    elif filename.endswith((".png", ".jpg", ".jpeg")):
-        try:
-            image = Image.open(file)
-            processed_img = preprocess_image(image)
-            text = pytesseract.image_to_string(processed_img, lang='eng')
-            text = clean_ocr_text(text)
-            if text.strip():
-                return f"[✅ Image detected]\n{text}"
-            else:
-                return "[⚠️ No readable text detected in this image.]"
-        except Exception as e:
-            return f"[❌ Error reading image: {str(e)}]"
+            return f"[❌ Error reading TXT: {str(e)}]", True
 
     else:
-        return "[❌ Unsupported file type.]"
+        return "[❌ Unsupported file type.]", True
 
-# === Personal Info Detector (Optional) ===
-def detect_personal_info(text):
+
+# === Personal Info Detector ===
+def detect_personal_info(text: str) -> list[tuple[str, list[str]]]:
     """Find emails, phone numbers, Aadhaar, addresses using regex."""
+    # --- Check if scanned or unreadable ---
+    if "scanned" in text.lower() or "not supported" in text.lower():
+        return [("Notice", ["Scanned or image-based documents are not supported for text extraction."])]
+
     patterns = {
         "Email": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
         "Phone Number": r"\b(?:\+91[-\s]?)?[6-9]\d{9}\b",
         "Aadhaar Number": r"\b\d{4}\s?\d{4}\s?\d{4}\b",
         "Address (hint)": r"\b(?:street|road|colony|nagar|block|sector)\b.*",
     }
+
     results = []
     for label, pattern in patterns.items():
         matches = re.findall(pattern, text, re.IGNORECASE)
         if matches:
             results.append((label, list(set(matches))))
+
+    if not results:
+        results.append(("✅ Status", ["No personal information found in this document."]))
+
     return results

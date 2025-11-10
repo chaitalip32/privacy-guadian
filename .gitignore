@@ -1,32 +1,20 @@
-# Ignore Python cache files
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.db
 
-# Ignore virtual environments
+# Virtual environment
 venv/
-.env/
-*.env
+env/
 
-# Ignore IDE/editor settings
-.vscode/
-.idea/
-*.swp
-*.swo
+# Streamlit
+.streamlit/
 
-# Ignore OS-specific files
+# Logs
+*.log
+
+# OS files
 .DS_Store
 Thumbs.db
-
-# Ignore logs and temp files
-*.log
-*.tmp
-
-# Ignore Jupyter Notebook checkpoints (if using notebooks)
-.ipynb_checkpoints/
-
-# Ignore build and distribution folders (if packaging)
-build/
-dist/
-*.egg-info/

@@ -2,6 +2,7 @@ import streamlit as st
 from src.breach_checker import check_mock_breaches, check_password_breaches
 from src.document_scanner import extract_text, detect_personal_info
 
+st.markdown("<style>#MainMenu {visibility:hidden;} header {visibility:hidden;} footer {visibility:hidden;}</style>", unsafe_allow_html=True)
 st.set_page_config(page_title="Privacy Guardian", page_icon="🛡️", layout="wide")
 
 # --- Custom CSS ---
@@ -23,7 +24,7 @@ st.write("### Protect your digital identity — Check, Scan and Stay Safe Online
 
 # --- Sidebar Navigation ---
 page = st.sidebar.radio("🧭 Navigate", 
-                        ["Home", "Email & Password Checker", "Document Scanner", "About"])
+                        ["Home", "Email & Password Checker", "Document Scanner", "Privacy Policy Summarizer", "About"])
 
 # --- Home ---
 if page == "Home":
@@ -77,20 +78,30 @@ elif page == "Document Scanner":
     uploaded_file = st.file_uploader("Upload File", type=["pdf", "docx", "txt"])
 
     if uploaded_file:
-        text = extract_text(uploaded_file)
-        if not text.strip():
+        text, is_scanned = extract_text(uploaded_file)
+
+        if is_scanned:
+            # 📄 File is scanned or image-based
+            st.warning("⚠️ Scanned or image-based documents are not supported for text extraction.")
+        elif not text.strip():
             st.warning("⚠️ No readable text found in file.")
         else:
+            # ✅ Normal text-based document
             st.success("✅ File uploaded and processed.")
             results = detect_personal_info(text)
+
             if results:
-                st.error("⚠️ Sensitive Information Detected:")
+                has_sensitive = any(label != "✅ Status" for label, _ in results)
+                if has_sensitive:
+                    st.error("⚠️ Sensitive Information Detected:")
+                else:
+                    st.success("🎉 No personal information found in this document.")
+
                 for label, matches in results:
                     st.write(f"**{label}:**")
                     for item in matches[:5]:
                         st.code(item)
-            else:
-                st.success("🎉 No personal information found in this document.")
+
             if st.checkbox("Show Extracted Text"):
                 st.text_area("Document Content", text, height=250)
 
@@ -98,11 +109,78 @@ elif page == "Document Scanner":
 elif page == "About":
     st.markdown("## ℹ️ About Privacy Guardian")
     st.write("""
-    **Technologies:** Python 3.10+, Streamlit, Pandas, PDFPlumber, Regex  
-    **Upcoming Feature:** 🧠 Privacy Policy Summarizer using Hugging Face  
-    👩‍💻 Developed by : **Your Name**
+    **Privacy Guardian** helps you protect your personal information and stay safe online.
+
+    In today’s digital world, our data is constantly at risk — from online breaches to apps collecting private details.  
+    **Privacy Guardian** makes it easy to understand and control how your data is used.
+
+    ### What You Can Do:
+    - 🔐 **Check Data Breaches:** Find out if your email or password has been leaked in any known cyber breaches.  
+    - 📄 **Scan Documents:** Upload files to automatically detect sensitive details like Aadhaar numbers, phone numbers, or emails.  
+    - 🧠 **Summarize Privacy Policies:** Instantly understand how websites use your data and identify potential risks.
+
+    ### Why Use It:
+    - Simple, fast, and completely secure.  
+    - Helps you make informed decisions about your digital privacy.  
+    - Designed for everyone — no technical knowledge required.
+
+    **Your privacy, simplified.**
     """)
 
+# --- Privacy Policy Summarizer ---
+elif page == "Privacy Policy Summarizer":
+    st.markdown("## 🧠 Privacy Policy Summarizer")
+    st.write("Paste a privacy policy text or enter a link to summarize and detect potential risks.")
+
+    option = st.radio("Input Type:", ["Text", "URL"])
+    if option == "Text":
+        text_input = st.text_area("Paste Privacy Policy Text:", height=250)
+        if st.button("Summarize Policy"):
+            if text_input.strip():
+                from src.privacy_policy_summarizer import analyze_privacy_policy
+                with st.spinner("Analyzing policy..."):
+                    summary, risks = analyze_privacy_policy(text_input, is_url=False)
+                st.subheader("🔍 Summary")
+                st.write(summary)
+                st.subheader("⚠️ Detected Risks")
+                for r in risks:
+                    st.warning(r)
+            else:
+                st.warning("Please enter some text.")
+    else:
+        url_input = st.text_input("Enter Privacy Policy URL:")
+        if st.button("Fetch & Summarize"):
+            if url_input.strip():
+                from src.privacy_policy_summarizer import analyze_privacy_policy
+                with st.spinner("Fetching and summarizing policy..."):
+                    summary, risks = analyze_privacy_policy(url_input, is_url=True)
+                st.subheader("🔍 Summary")
+                st.write(summary)
+                st.subheader("⚠️ Detected Risks")
+                for r in risks:
+                    st.warning(r)
+            else:
+                st.warning("Please enter a valid URL.")
+
 # --- Footer ---
-st.markdown("<div class='footer'>🔐 Privacy Guardian | Built with ❤️ using Python & Streamlit</div>", 
-            unsafe_allow_html=True)
+st.markdown("""
+<style>
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #2C3E50;
+    color: #ECF0F1;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    letter-spacing: 0.3px;
+}
+</style>
+
+<div class='footer'>
+    © 2025 Privacy Guardian — Powered by Python & Streamlit
+</div>
+""", unsafe_allow_html=True)
