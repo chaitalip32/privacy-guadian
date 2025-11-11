@@ -2,29 +2,65 @@ import streamlit as st
 from src.breach_checker import check_mock_breaches, check_password_breaches
 from src.document_scanner import extract_text, detect_personal_info
 
-st.markdown("<style>#MainMenu {visibility:hidden;} header {visibility:hidden;} footer {visibility:hidden;}</style>", unsafe_allow_html=True)
+# --- Hide Deploy and 3-dot buttons ---
+hide_streamlit_style = """
+    <style>
+    header {visibility: visible !important;}
+    #MainMenu {visibility: visible !important;}
+    footer {visibility: hidden !important;}
+    [data-testid="stActionButtonIcon"] {display: none !important;}
+    .stDeployButton {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 st.set_page_config(page_title="Privacy Guardian", page_icon="🛡️", layout="wide")
 
 # --- Custom CSS ---
 st.markdown("""
 <style>
 .main {background-color:#f8f9fa;}
-.title {text-align:center;color:#2C3E50;}
-.footer {position:fixed;left:0;bottom:0;width:100%;
-         background-color:#2C3E50;color:white;text-align:center;
-         padding:10px;font-size:14px;}
-.stButton>button{background-color:#2E86C1;color:white;border-radius:10px;
-                height:3em;width:12em;font-weight:bold;}
-.stButton>button:hover{background-color:#1B4F72;color:#F8F9F9;}
+.title {text-align:center;color:#2C3E50;font-size:45px;font-weight:800;}
+.subtitle {text-align:center;color:#34495E;font-size:18px;margin-top:-10px;}
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #2C3E50;
+    color: #ECF0F1;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 14px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    letter-spacing: 0.3px;
+}
+.stButton>button {
+    background-color:#2E86C1;
+    color:white;
+    border-radius:10px;
+    height:3em;
+    width:12em;
+    font-weight:bold;
+}
+.stButton>button:hover {
+    background-color:#1B4F72;
+    color:#F8F9F9;
+}
 </style>
 """, unsafe_allow_html=True)
-
-st.markdown("<h1 class='title'>🛡️ Privacy Guardian Dashboard</h1>", unsafe_allow_html=True)
-st.write("### Protect your digital identity — Check, Scan and Stay Safe Online.")
 
 # --- Sidebar Navigation ---
 page = st.sidebar.radio("🧭 Navigate", 
                         ["Home", "Email & Password Checker", "Document Scanner", "Privacy Policy Summarizer", "About"])
+
+# --- Dynamic Page Title ---
+if page == "About":
+    st.markdown("<h1 class='title'>About Us</h1>", unsafe_allow_html=True)
+else:
+    st.markdown("<h1 class='title'>🛡️ Privacy Guardian Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Protect your digital identity — Check, Scan and Stay Safe Online.</div>", unsafe_allow_html=True)
 
 # --- Home ---
 if page == "Home":
@@ -32,7 +68,7 @@ if page == "Home":
     **Privacy Guardian** helps you:
     - Detect if your email or password was breached  
     - Scan documents for personal info (Aadhaar, emails etc.)  
-    - Summarize privacy policies (coming soon)
+    - Summarize privacy policies
     """)
 
 # --- Email & Password Checker ---
@@ -81,12 +117,10 @@ elif page == "Document Scanner":
         text, is_scanned = extract_text(uploaded_file)
 
         if is_scanned:
-            # 📄 File is scanned or image-based
             st.warning("⚠️ Scanned or image-based documents are not supported for text extraction.")
         elif not text.strip():
             st.warning("⚠️ No readable text found in file.")
         else:
-            # ✅ Normal text-based document
             st.success("✅ File uploaded and processed.")
             results = detect_personal_info(text)
 
@@ -105,8 +139,34 @@ elif page == "Document Scanner":
             if st.checkbox("Show Extracted Text"):
                 st.text_area("Document Content", text, height=250)
 
-# --- About ---
+# --- About Page ---
 elif page == "About":
+    st.markdown("""
+    <style>
+    .project-authors {
+        text-align: center;
+        font-size: 32px;
+        font-weight: 800;
+        color: #004aad;
+        letter-spacing: 1px;
+        margin-top: -10px;
+        margin-bottom: 20px;
+    }
+    .project-subtitle {
+        text-align: center;
+        font-size: 18px;
+        color: #333333;
+        margin-bottom: 40px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="project-authors">
+         Chaitali Pednekar & Shramika Patane
+    </div>
+    """, unsafe_allow_html=True)
+
     st.markdown("## ℹ️ About Privacy Guardian")
     st.write("""
     **Privacy Guardian** helps you protect your personal information and stay safe online.
@@ -115,9 +175,9 @@ elif page == "About":
     **Privacy Guardian** makes it easy to understand and control how your data is used.
 
     ### What You Can Do:
-    - 🔐 **Check Data Breaches:** Find out if your email or password has been leaked in any known cyber breaches.  
-    - 📄 **Scan Documents:** Upload files to automatically detect sensitive details like Aadhaar numbers, phone numbers, or emails.  
-    - 🧠 **Summarize Privacy Policies:** Instantly understand how websites use your data and identify potential risks.
+    -  **Check Data Breaches:** Find out if your email or password has been leaked in any known cyber breaches.  
+    -  **Scan Documents:** Upload files to automatically detect sensitive details like Aadhaar numbers, phone numbers, or emails.  
+    -  **Summarize Privacy Policies:** Instantly understand how websites use your data and identify potential risks.
 
     ### Why Use It:
     - Simple, fast, and completely secure.  
@@ -129,7 +189,7 @@ elif page == "About":
 
 # --- Privacy Policy Summarizer ---
 elif page == "Privacy Policy Summarizer":
-    st.markdown("## 🧠 Privacy Policy Summarizer")
+    st.markdown("##  Privacy Policy Summarizer")
     st.write("Paste a privacy policy text or enter a link to summarize and detect potential risks.")
 
     option = st.radio("Input Type:", ["Text", "URL"])
@@ -164,23 +224,7 @@ elif page == "Privacy Policy Summarizer":
 
 # --- Footer ---
 st.markdown("""
-<style>
-.footer {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    background-color: #2C3E50;
-    color: #ECF0F1;
-    text-align: center;
-    padding: 10px 0;
-    font-size: 14px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    letter-spacing: 0.3px;
-}
-</style>
-
 <div class='footer'>
-    © 2025 Privacy Guardian — Powered by Python & Streamlit
+    © 2025 Privacy Guardian — Developed by <b>Chaitali Pednekar</b> & <b>Shramika Patane</b>
 </div>
 """, unsafe_allow_html=True)
